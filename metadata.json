@@ -1,0 +1,8 @@
+{
+  "name": "지원자 데이터 통합 관리자",
+  "description": "엑셀 데이터를 로컬에서 안전하게 매핑, 정제, 필터링 및 관리할 수 있는 채용 담당자용 웹 기반 툴입니다.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
