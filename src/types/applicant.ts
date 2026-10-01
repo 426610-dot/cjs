@@ -1,21 +1,27 @@
-export type ApplicantStatus = '검토 전' | '서류 통과' | '보류' | '탈락';
+export type ApplicantStatus = '심사 중' | '최종 합격' | '예비 합격' | '불합격';
 
 export const APPLICANT_STATUSES: ApplicantStatus[] = [
-  '검토 전',
-  '서류 통과',
-  '보류',
-  '탈락',
+  '심사 중',
+  '최종 합격',
+  '예비 합격',
+  '불합격',
 ];
 
 export type StandardFieldKey =
-  | 'name'
-  | 'phone'
-  | 'email'
-  | 'position'
-  | 'source'
-  | 'experience'
-  | 'appliedDate'
-  | 'memo';
+  | 'name'                // 성명
+  | 'phone'               // 연락처
+  | 'examNumber'          // 응시번호
+  | 'email'               // 이메일
+  | 'address'             // 주소
+  | 'recruitmentCategory' // 모집구분
+  | 'supportNeeds'        // 편의지원
+  | 'disabilityStatus'    // 장애인
+  | 'lowIncomeStatus'     // 저소득
+  | 'historyScore'        // 한국사
+  | 'writtenScore'        // 필기점수
+  | 'interviewScore'      // 면접점수
+  | 'finalResult'         // 최종합격여부
+  | 'memo';               // 비고/메모
 
 export interface StandardFieldMeta {
   key: StandardFieldKey;
@@ -25,14 +31,20 @@ export interface StandardFieldMeta {
 }
 
 export const STANDARD_FIELDS: StandardFieldMeta[] = [
-  { key: 'name', label: '이름', required: true, description: '앞뒤 공백 제거 및 연속 공백 통일' },
-  { key: 'phone', label: '연락처', required: true, description: '010-1234-5678 형식 통일 (+82 등 처리)' },
+  { key: 'name', label: '성명', required: true, description: '앞뒤 공백 제거 및 연속 공백 정리' },
+  { key: 'phone', label: '연락처', required: true, description: '010-1234-5678 형식 통일 (+82 등 정리)' },
+  { key: 'examNumber', label: '응시번호', required: true, description: '수험번호 및 접수번호' },
   { key: 'email', label: '이메일', required: true, description: '소문자 변환 및 이메일 형식 검증' },
-  { key: 'position', label: '지원 포지션', required: true, description: '지원 직무 및 모집 부문' },
-  { key: 'source', label: '지원 경로', description: '채용 사이트, 추천, 자사 홈페이지 등' },
-  { key: 'experience', label: '경력(년)', description: '신입→0, 3년 6개월→3.5 등 숫자 변환' },
-  { key: 'appliedDate', label: '지원일', description: 'YYYY-MM-DD 날짜 형식 통일' },
-  { key: 'memo', label: '기타 메모', description: '특이사항, 포트폴리오 링크, 참고 메모' },
+  { key: 'address', label: '주소', description: '거주지 및 도로명/지번 주소' },
+  { key: 'recruitmentCategory', label: '모집구분', required: true, description: '응시 직렬, 채용 직무, 모집 분야' },
+  { key: 'supportNeeds', label: '편의지원', description: '시험 편의지원 신청 내역 (돋보기, 시간연장 등)' },
+  { key: 'disabilityStatus', label: '장애인', description: '장애인 구분 (대상, 비대상, 중증, 경증)' },
+  { key: 'lowIncomeStatus', label: '저소득', description: '저소득층 구분 (수급자, 차상위, 비대상 등)' },
+  { key: 'historyScore', label: '한국사', description: '한국사능력검정시험 급수/점수' },
+  { key: 'writtenScore', label: '필기점수', description: '필기전형 시험 점수' },
+  { key: 'interviewScore', label: '면접점수', description: '면접전형 시험 점수' },
+  { key: 'finalResult', label: '최종합격여부', description: '최종 합격, 예비 합격, 불합격, 심사 중' },
+  { key: 'memo', label: '비고(메모)', description: '기타 특이사항 및 참고 메모' },
 ];
 
 export type ColumnMapping = Record<string, StandardFieldKey | 'ignore'>;
@@ -52,17 +64,20 @@ export interface Applicant {
   phone: string;
   rawPhone?: string;
   phoneValid: boolean;
+  examNumber: string;
   email: string;
   rawEmail?: string;
   emailValid: boolean;
-  position: string;
-  source: string;
-  experience: number;
-  rawExperience?: string;
-  experienceValid: boolean;
-  appliedDate: string;
-  rawAppliedDate?: string;
-  appliedDateValid: boolean;
+  address: string;
+  recruitmentCategory: string;
+  supportNeeds: string;
+  disabilityStatus: string;
+  lowIncomeStatus: string;
+  historyScore: string;
+  writtenScore: number | null;
+  rawWrittenScore?: string;
+  interviewScore: number | null;
+  rawInterviewScore?: string;
   status: ApplicantStatus;
   tags: string[];
   memo: string;
@@ -89,14 +104,13 @@ export interface ImportSummary {
   timestamp: string;
 }
 
-export type ExperienceFilterRange = 'all' | 'entry' | '1to3' | '3to7' | '7plus';
-
 export interface FilterState {
   search: string;
-  position: string;
-  source: string;
+  recruitmentCategory: string;
   status: ApplicantStatus | 'all';
-  experienceRange: ExperienceFilterRange;
+  disabilityFilter: string;
+  lowIncomeFilter: string;
+  supportNeedsFilter: string;
   tag: string;
   onlyDuplicates: boolean;
   onlyFormatErrors: boolean;
@@ -105,11 +119,11 @@ export interface FilterState {
 export type SortField =
   | 'name'
   | 'phone'
+  | 'examNumber'
   | 'email'
-  | 'position'
-  | 'source'
-  | 'experience'
-  | 'appliedDate'
+  | 'recruitmentCategory'
+  | 'writtenScore'
+  | 'interviewScore'
   | 'status';
 
 export type SortDirection = 'asc' | 'desc';

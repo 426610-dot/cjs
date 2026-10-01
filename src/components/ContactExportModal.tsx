@@ -19,17 +19,17 @@ export const ContactExportModal: React.FC<ContactExportModalProps> = ({
   applicants,
 }) => {
   const [selectedStatuses, setSelectedStatuses] = useState<ApplicantStatus[]>([
-    '서류 통과',
+    '최종 합격',
   ]);
   const [includeExtra, setIncludeExtra] = useState(false);
   const [copiedType, setCopiedType] = useState<'email' | 'phone' | null>(null);
 
   const statusCounts = useMemo(() => {
     const map: Record<ApplicantStatus, number> = {
-      '검토 전': 0,
-      '서류 통과': 0,
-      보류: 0,
-      탈락: 0,
+      '심사 중': 0,
+      '최종 합격': 0,
+      '예비 합격': 0,
+      '불합격': 0,
     };
     for (const app of applicants) {
       map[app.status] = (map[app.status] || 0) + 1;
@@ -88,10 +88,10 @@ export const ContactExportModal: React.FC<ContactExportModalProps> = ({
             <span className="w-2.5 h-2.5 rounded-full bg-blue-600 inline-block"></span>
             <div>
               <h2 className="text-base font-semibold text-slate-900">
-                연락 대상 명단 추출 (이름 · 연락처 · 이메일 · 포지션)
+                연락 대상 명단 추출 (성명 · 연락처 · 응시번호 · 이메일 · 모집구분)
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">
-                합격 안내 또는 면접 알림을 위해 특정 상태 지원자의 연락처만 간추려 엑셀로 저장합니다.
+                합격 안내 또는 면접 알림을 위해 특정 합격여부 상태 응시자의 연락처만 간추려 엑셀로 저장합니다.
               </p>
             </div>
           </div>
@@ -201,11 +201,12 @@ export const ContactExportModal: React.FC<ContactExportModalProps> = ({
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
                     <tr className="border-b border-slate-200 text-slate-500 bg-white">
-                      <th className="py-2 px-3">이름</th>
+                      <th className="py-2 px-3">성명</th>
                       <th className="py-2 px-3">연락처</th>
+                      <th className="py-2 px-3">응시번호</th>
                       <th className="py-2 px-3">이메일</th>
-                      <th className="py-2 px-3">지원 포지션</th>
-                      <th className="py-2 px-3">상태</th>
+                      <th className="py-2 px-3">모집구분</th>
+                      <th className="py-2 px-3">최종합격여부</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -218,10 +219,13 @@ export const ContactExportModal: React.FC<ContactExportModalProps> = ({
                           {app.phone}
                         </td>
                         <td className="py-2 px-3 font-mono-tabular text-slate-700 whitespace-nowrap">
+                          {app.examNumber}
+                        </td>
+                        <td className="py-2 px-3 font-mono-tabular text-slate-700 whitespace-nowrap">
                           {app.email}
                         </td>
-                        <td className="py-2 px-3 text-slate-700 whitespace-nowrap">
-                          {app.position}
+                        <td className="py-2 px-3 text-slate-700 whitespace-nowrap font-medium">
+                          {app.recruitmentCategory}
                         </td>
                         <td className="py-2 px-3 text-slate-600 whitespace-nowrap font-medium">
                           {app.status}

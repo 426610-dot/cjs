@@ -29,10 +29,11 @@ const STORAGE_KEY = 'hr_applicant_unified_manager_v2';
 
 const INITIAL_FILTER: FilterState = {
   search: '',
-  position: 'all',
-  source: 'all',
+  recruitmentCategory: 'all',
   status: 'all',
-  experienceRange: 'all',
+  disabilityFilter: 'all',
+  lowIncomeFilter: 'all',
+  supportNeedsFilter: 'all',
   tag: 'all',
   onlyDuplicates: false,
   onlyFormatErrors: false,
@@ -59,8 +60,8 @@ export function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('list');
   const [filter, setFilter] = useState<FilterState>(INITIAL_FILTER);
   const [sort, setSort] = useState<SortState>({
-    field: 'appliedDate',
-    direction: 'desc',
+    field: 'examNumber',
+    direction: 'asc',
   });
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [drawerApplicantId, setDrawerApplicantId] = useState<string | null>(null);
@@ -92,10 +93,15 @@ export function App() {
         const haystack = [
           app.name,
           app.phone,
+          app.examNumber,
           app.email,
+          app.address,
+          app.recruitmentCategory,
+          app.supportNeeds,
+          app.disabilityStatus,
+          app.lowIncomeStatus,
+          app.historyScore,
           app.memo,
-          app.position,
-          app.source,
           ...app.tags,
         ]
           .join(' ')
@@ -103,11 +109,11 @@ export function App() {
         if (!haystack.includes(q)) return false;
       }
 
-      if (filter.position !== 'all' && app.position !== filter.position) {
-        return false;
-      }
-
-      if (filter.source !== 'all' && app.source !== filter.source) {
+      if (
+        filter.recruitmentCategory &&
+        filter.recruitmentCategory !== 'all' &&
+        app.recruitmentCategory !== filter.recruitmentCategory
+      ) {
         return false;
       }
 
@@ -115,16 +121,43 @@ export function App() {
         return false;
       }
 
-      if (filter.tag !== 'all' && !app.tags.includes(filter.tag)) {
+      if (
+        filter.disabilityFilter &&
+        filter.disabilityFilter !== 'all' &&
+        app.disabilityStatus !== filter.disabilityFilter
+      ) {
         return false;
       }
 
-      if (filter.experienceRange !== 'all') {
-        const exp = app.experience;
-        if (filter.experienceRange === 'entry' && exp !== 0) return false;
-        if (filter.experienceRange === '1to3' && (exp <= 0 || exp > 3)) return false;
-        if (filter.experienceRange === '3to7' && (exp <= 3 || exp > 7)) return false;
-        if (filter.experienceRange === '7plus' && exp <= 7) return false;
+      if (
+        filter.lowIncomeFilter &&
+        filter.lowIncomeFilter !== 'all' &&
+        app.lowIncomeStatus !== filter.lowIncomeFilter
+      ) {
+        return false;
+      }
+
+      if (filter.supportNeedsFilter && filter.supportNeedsFilter !== 'all') {
+        if (
+          filter.supportNeedsFilter === '신청' &&
+          (!app.supportNeeds ||
+            app.supportNeeds === '해당없음' ||
+            app.supportNeeds === '없음')
+        ) {
+          return false;
+        }
+        if (
+          filter.supportNeedsFilter === '미신청' &&
+          app.supportNeeds &&
+          app.supportNeeds !== '해당없음' &&
+          app.supportNeeds !== '없음'
+        ) {
+          return false;
+        }
+      }
+
+      if (filter.tag && filter.tag !== 'all' && !app.tags.includes(filter.tag)) {
+        return false;
       }
 
       if (
@@ -145,8 +178,10 @@ export function App() {
     const dir = sort.direction === 'asc' ? 1 : -1;
     return [...filtered].sort((a, b) => {
       const f = sort.field;
-      if (f === 'experience') {
-        return (a.experience - b.experience) * dir;
+      if (f === 'writtenScore' || f === 'interviewScore') {
+        const scoreA = a[f] ?? -999;
+        const scoreB = b[f] ?? -999;
+        return (scoreA - scoreB) * dir;
       }
       const valA = String(a[f] || '');
       const valB = String(b[f] || '');
@@ -240,17 +275,18 @@ export function App() {
       const mergedMemo = [primary.memo, secondary.memo]
         .filter(Boolean)
         .join(' | [병합] ');
-      const mergedSource =
-        primary.source.includes(secondary.source)
-          ? primary.source
-          : `${primary.source} / ${secondary.source}`;
 
       const updatedPrimary: Applicant = {
         ...primary,
         phone: primary.phoneValid ? primary.phone : secondary.phone,
         email: primary.emailValid ? primary.email : secondary.email,
-        experience: Math.max(primary.experience, secondary.experience),
-        source: mergedSource,
+        address: primary.address || secondary.address,
+        supportNeeds:
+          primary.supportNeeds && primary.supportNeeds !== '해당없음'
+            ? primary.supportNeeds
+            : secondary.supportNeeds,
+        writtenScore: primary.writtenScore ?? secondary.writtenScore,
+        interviewScore: primary.interviewScore ?? secondary.interviewScore,
         tags: mergedTags,
         memo: mergedMemo,
       };
@@ -261,7 +297,7 @@ export function App() {
 
       return recomputeApplicantsMetadata(remaining);
     });
-    showNotice('중복 지원 내역이 병합되었습니다.');
+    showNotice('동일인 응시 데이터가 병합되었습니다.');
   };
 
   const handleBulkStatusChange = (status: ApplicantStatus) => {
@@ -512,11 +548,11 @@ export function App() {
                             </span>
                             <span className="text-slate-300">·</span>
                             <span className="text-slate-600 truncate">
-                              {item.position}
+                              {item.recruitmentCategory}
                             </span>
                           </div>
                           <div className="text-[11px] text-slate-500 font-mono-tabular mt-0.5 truncate">
-                            {item.phone} · {item.source}
+                            {item.examNumber} · {item.phone}
                           </div>
                         </div>
                         <div className="text-right shrink-0">
@@ -530,8 +566,8 @@ export function App() {
                               {item.hasFormatError
                                 ? '형식오류'
                                 : item.isSamePositionDuplicate
-                                ? '중복지원'
-                                : '복수포지션'}
+                                ? '동일분야중복'
+                                : '복수지원'}
                             </span>
                           )}
                         </div>

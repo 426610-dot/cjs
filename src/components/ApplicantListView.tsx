@@ -19,7 +19,6 @@ import {
   Applicant,
   APPLICANT_STATUSES,
   ApplicantStatus,
-  ExperienceFilterRange,
   FilterState,
   SortField,
   SortState,
@@ -52,10 +51,10 @@ interface ApplicantListViewProps {
 }
 
 const STATUS_SELECT_STYLES: Record<ApplicantStatus, string> = {
-  '검토 전': 'bg-slate-100 text-slate-800 border-slate-300',
-  '서류 통과': 'bg-emerald-50 text-emerald-800 border-emerald-300',
-  보류: 'bg-amber-50 text-amber-800 border-amber-300',
-  탈락: 'bg-rose-50 text-rose-800 border-rose-300',
+  '심사 중': 'bg-slate-100 text-slate-800 border-slate-300',
+  '최종 합격': 'bg-emerald-50 text-emerald-800 border-emerald-300',
+  '예비 합격': 'bg-amber-50 text-amber-800 border-amber-300',
+  '불합격': 'bg-rose-50 text-rose-800 border-rose-300',
 };
 
 export const ApplicantListView: React.FC<ApplicantListViewProps> = ({
@@ -86,10 +85,10 @@ export const ApplicantListView: React.FC<ApplicantListViewProps> = ({
 
   const statusSummary = React.useMemo(() => {
     const counts: Record<ApplicantStatus, number> = {
-      '검토 전': 0,
-      '서류 통과': 0,
-      보류: 0,
-      탈락: 0,
+      '심사 중': 0,
+      '최종 합격': 0,
+      '예비 합격': 0,
+      '불합격': 0,
     };
     let duplicateSuspectCount = 0;
     let formatErrorCount = 0;
@@ -107,19 +106,31 @@ export const ApplicantListView: React.FC<ApplicantListViewProps> = ({
   }, [allApplicants]);
 
   const filterOptions = React.useMemo(() => {
-    const positions = new Set<string>();
-    const sources = new Set<string>();
+    const categories = new Set<string>();
+    const disabilities = new Set<string>();
+    const lowIncomes = new Set<string>();
+    const supportNeeds = new Set<string>();
     const tags = new Set<string>();
 
     for (const app of allApplicants) {
-      if (app.position) positions.add(app.position);
-      if (app.source) sources.add(app.source);
+      if (app.recruitmentCategory) categories.add(app.recruitmentCategory);
+      if (app.disabilityStatus && app.disabilityStatus !== '비대상') {
+        disabilities.add(app.disabilityStatus);
+      }
+      if (app.lowIncomeStatus && app.lowIncomeStatus !== '비대상') {
+        lowIncomes.add(app.lowIncomeStatus);
+      }
+      if (app.supportNeeds && app.supportNeeds !== '해당없음') {
+        supportNeeds.add(app.supportNeeds);
+      }
       app.tags.forEach((t) => tags.add(t));
     }
 
     return {
-      positions: Array.from(positions).sort(),
-      sources: Array.from(sources).sort(),
+      categories: Array.from(categories).sort(),
+      disabilities: Array.from(disabilities).sort(),
+      lowIncomes: Array.from(lowIncomes).sort(),
+      supportNeeds: Array.from(supportNeeds).sort(),
       tags: Array.from(tags).sort(),
     };
   }, [allApplicants]);
@@ -131,11 +142,11 @@ export const ApplicantListView: React.FC<ApplicantListViewProps> = ({
           <FileSpreadsheet className="w-6 h-6" />
         </div>
         <h2 className="text-lg font-semibold text-slate-900">
-          아직 등록된 지원자 데이터가 없습니다
+          아직 등록된 응시자 데이터가 없습니다
         </h2>
         <p className="text-sm text-slate-600 mt-1.5 leading-relaxed">
-          채용 사이트에서 받은 엑셀·CSV 파일을 업로드하여 표준 형식으로 정리하거나,
-          준비된 22명의 가상 지원자 샘플 데이터를 불러와 즉시 사용해 보세요.
+          채용 사이트 및 접수대장 엑셀·CSV 파일을 업로드하거나,
+          준비된 22명의 가상 응시자 샘플 데이터를 불러와 즉시 확인해 보세요.
         </p>
         <div className="flex flex-wrap items-center justify-center gap-3 mt-6">
           <button
@@ -144,7 +155,7 @@ export const ApplicantListView: React.FC<ApplicantListViewProps> = ({
             className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors cursor-pointer shadow-xs"
           >
             <Sparkles className="w-4 h-4" />
-            샘플 데이터 불러오기 (지원자 22명)
+            샘플 데이터 불러오기 (응시자 22명)
           </button>
           <button
             type="button"
@@ -165,10 +176,11 @@ export const ApplicantListView: React.FC<ApplicantListViewProps> = ({
 
   const hasActiveFilters =
     filter.search.trim() !== '' ||
-    filter.position !== 'all' ||
-    filter.source !== 'all' ||
+    filter.recruitmentCategory !== 'all' ||
     filter.status !== 'all' ||
-    filter.experienceRange !== 'all' ||
+    filter.disabilityFilter !== 'all' ||
+    filter.lowIncomeFilter !== 'all' ||
+    filter.supportNeedsFilter !== 'all' ||
     filter.tag !== 'all' ||
     filter.onlyDuplicates ||
     filter.onlyFormatErrors;
@@ -207,7 +219,7 @@ export const ApplicantListView: React.FC<ApplicantListViewProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* 1. 상단 요약 카드 (클릭 시 해당 상태 필터 토글) */}
+      {/* 1. 상단 요약 카드 (최종합격여부별 집계) */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <button
           type="button"
@@ -223,7 +235,7 @@ export const ApplicantListView: React.FC<ApplicantListViewProps> = ({
               filter.status === 'all' ? 'text-slate-300' : 'text-slate-500'
             }`}
           >
-            전체 지원자
+            전체 응시자
           </div>
           <div className="text-2xl font-bold mt-1 tabular-nums">
             {allApplicants.length}명
@@ -265,7 +277,7 @@ export const ApplicantListView: React.FC<ApplicantListViewProps> = ({
       </div>
 
       {/* 2. 검색 및 컨트롤 바 */}
-      <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3">
+      <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3 shadow-xs">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           <div className="relative flex-1 max-w-md">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -273,7 +285,7 @@ export const ApplicantListView: React.FC<ApplicantListViewProps> = ({
               type="text"
               value={filter.search}
               onChange={(e) => onFilterChange({ search: e.target.value })}
-              placeholder="이름, 연락처, 이메일, 메모, 태그 통합 검색..."
+              placeholder="성명, 연락처, 응시번호, 이메일, 주소, 모집구분 통합 검색..."
               className="w-full pl-9 pr-8 py-2 text-xs border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             {filter.search && (
@@ -319,81 +331,84 @@ export const ApplicantListView: React.FC<ApplicantListViewProps> = ({
 
         <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
           <select
-            aria-label="지원 포지션 필터"
-            value={filter.position}
-            onChange={(e) => onFilterChange({ position: e.target.value })}
+            aria-label="모집구분 필터"
+            value={filter.recruitmentCategory}
+            onChange={(e) => onFilterChange({ recruitmentCategory: e.target.value })}
             className="text-xs border border-slate-300 rounded-md px-2.5 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
-            <option value="all">모든 지원 포지션</option>
-            {filterOptions.positions.map((pos) => (
-              <option key={pos} value={pos}>
-                포지션: {pos}
+            <option value="all">모든 모집구분</option>
+            {filterOptions.categories.map((cat) => (
+              <option key={cat} value={cat}>
+                구분: {cat}
               </option>
             ))}
           </select>
 
           <select
-            aria-label="지원 경로 필터"
-            value={filter.source}
-            onChange={(e) => onFilterChange({ source: e.target.value })}
-            className="text-xs border border-slate-300 rounded-md px-2.5 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="all">모든 지원 경로</option>
-            {filterOptions.sources.map((src) => (
-              <option key={src} value={src}>
-                경로: {src}
-              </option>
-            ))}
-          </select>
-
-          <select
-            aria-label="상태 필터"
+            aria-label="최종합격여부 필터"
             value={filter.status}
             onChange={(e) =>
               onFilterChange({
                 status: e.target.value as ApplicantStatus | 'all',
               })
             }
-            className="text-xs border border-slate-300 rounded-md px-2.5 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="text-xs border border-slate-300 rounded-md px-2.5 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
           >
-            <option value="all">모든 전형 상태</option>
+            <option value="all">모든 최종합격여부</option>
             {APPLICANT_STATUSES.map((st) => (
               <option key={st} value={st}>
-                상태: {st}
+                결과: {st}
               </option>
             ))}
           </select>
 
-          <select
-            aria-label="경력 범위 필터"
-            value={filter.experienceRange}
-            onChange={(e) =>
-              onFilterChange({
-                experienceRange: e.target.value as ExperienceFilterRange,
-              })
-            }
-            className="text-xs border border-slate-300 rounded-md px-2.5 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="all">모든 경력</option>
-            <option value="entry">신입 (0년)</option>
-            <option value="1to3">1년 ~ 3년 이하</option>
-            <option value="3to7">3년 초과 ~ 7년 이하</option>
-            <option value="7plus">7년 초과 (시니어)</option>
-          </select>
+          {filterOptions.disabilities.length > 0 && (
+            <select
+              aria-label="장애인 구분 필터"
+              value={filter.disabilityFilter}
+              onChange={(e) => onFilterChange({ disabilityFilter: e.target.value })}
+              className="text-xs border border-slate-300 rounded-md px-2.5 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">장애인: 전체</option>
+              {filterOptions.disabilities.map((d) => (
+                <option key={d} value={d}>
+                  장애: {d}
+                </option>
+              ))}
+            </select>
+          )}
 
-          <select
-            aria-label="태그 필터"
-            value={filter.tag}
-            onChange={(e) => onFilterChange({ tag: e.target.value })}
-            className="text-xs border border-slate-300 rounded-md px-2.5 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="all">모든 태그</option>
-            {filterOptions.tags.map((t) => (
-              <option key={t} value={t}>
-                태그: #{t}
-              </option>
-            ))}
-          </select>
+          {filterOptions.lowIncomes.length > 0 && (
+            <select
+              aria-label="저소득 구분 필터"
+              value={filter.lowIncomeFilter}
+              onChange={(e) => onFilterChange({ lowIncomeFilter: e.target.value })}
+              className="text-xs border border-slate-300 rounded-md px-2.5 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">저소득: 전체</option>
+              {filterOptions.lowIncomes.map((li) => (
+                <option key={li} value={li}>
+                  저소득: {li}
+                </option>
+              ))}
+            </select>
+          )}
+
+          {filterOptions.supportNeeds.length > 0 && (
+            <select
+              aria-label="편의지원 필터"
+              value={filter.supportNeedsFilter}
+              onChange={(e) => onFilterChange({ supportNeedsFilter: e.target.value })}
+              className="text-xs border border-slate-300 rounded-md px-2.5 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">편의지원: 전체</option>
+              {filterOptions.supportNeeds.map((sn) => (
+                <option key={sn} value={sn}>
+                  편의지원: {sn}
+                </option>
+              ))}
+            </select>
+          )}
 
           <button
             type="button"
@@ -443,7 +458,7 @@ export const ApplicantListView: React.FC<ApplicantListViewProps> = ({
         </div>
       </div>
 
-      {/* 3. 일괄 작업 바 (선택 시 표시) */}
+      {/* 3. 일괄 작업 바 */}
       {selectedIds.size > 0 && (
         <div className="bg-slate-900 text-white rounded-lg px-4 py-3 flex flex-wrap items-center justify-between gap-3 shadow-md">
           <div className="flex items-center gap-2 text-xs">
@@ -462,7 +477,7 @@ export const ApplicantListView: React.FC<ApplicantListViewProps> = ({
 
           <div className="flex flex-wrap items-center gap-2.5">
             <div className="flex items-center gap-1.5">
-              <span className="text-xs text-slate-300">상태 일괄 변경:</span>
+              <span className="text-xs text-slate-300">최종결과 일괄 변경:</span>
               {APPLICANT_STATUSES.map((st) => (
                 <button
                   key={st}
@@ -540,22 +555,22 @@ export const ApplicantListView: React.FC<ApplicantListViewProps> = ({
         </div>
       )}
 
-      {/* 4. 지원자 표 */}
+      {/* 4. 13개 항목 응시자 메인 표 */}
       <div className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-xs">
         <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-xs text-slate-600">
           <div>
-            조회된 지원자{' '}
+            조회된 응시자{' '}
             <strong className="text-blue-700 tabular-nums">
               {filteredApplicants.length}명
             </strong>{' '}
-            (전체 {allApplicants.length}명) · 행을 클릭하면 오른쪽 상세 패널에서 정보 수정 및 중복 내역을 대조할 수 있습니다.
+            (전체 {allApplicants.length}명) · 행을 클릭하면 상세 패널에서 13개 전체 항목 수정 및 중복 내역을 대조할 수 있습니다.
           </div>
         </div>
 
         {filteredApplicants.length === 0 ? (
           <div className="py-16 text-center">
             <p className="text-sm font-medium text-slate-700">
-              조건에 맞는 지원자가 없습니다.
+              조건에 맞는 응시자가 없습니다.
             </p>
             <p className="text-xs text-slate-500 mt-1">
               검색어나 필터 조건을 변경하거나 초기화해 보세요.
@@ -571,9 +586,9 @@ export const ApplicantListView: React.FC<ApplicantListViewProps> = ({
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="bg-slate-50/90 border-b border-slate-200 text-xs font-semibold text-slate-600 select-none">
+                <tr className="bg-slate-50/90 border-b border-slate-200 font-semibold text-slate-600 select-none whitespace-nowrap">
                   <th className="py-2.5 px-3 w-10 text-center">
                     <input
                       type="checkbox"
@@ -583,17 +598,17 @@ export const ApplicantListView: React.FC<ApplicantListViewProps> = ({
                       className="rounded border-slate-300 accent-blue-600 cursor-pointer"
                     />
                   </th>
-                  <th className="py-2.5 px-3 whitespace-nowrap">
+                  <th className="py-2.5 px-3">
                     <button
                       type="button"
                       onClick={() => onToggleSort('name')}
                       className="inline-flex items-center gap-1 hover:text-slate-900 cursor-pointer"
                     >
-                      <span>이름</span>
+                      <span>성명</span>
                       {renderSortIcon('name')}
                     </button>
                   </th>
-                  <th className="py-2.5 px-3 whitespace-nowrap">
+                  <th className="py-2.5 px-3">
                     <button
                       type="button"
                       onClick={() => onToggleSort('phone')}
@@ -603,7 +618,17 @@ export const ApplicantListView: React.FC<ApplicantListViewProps> = ({
                       {renderSortIcon('phone')}
                     </button>
                   </th>
-                  <th className="py-2.5 px-3 whitespace-nowrap">
+                  <th className="py-2.5 px-3">
+                    <button
+                      type="button"
+                      onClick={() => onToggleSort('examNumber')}
+                      className="inline-flex items-center gap-1 hover:text-slate-900 cursor-pointer"
+                    >
+                      <span>응시번호</span>
+                      {renderSortIcon('examNumber')}
+                    </button>
+                  </th>
+                  <th className="py-2.5 px-3">
                     <button
                       type="button"
                       onClick={() => onToggleSort('email')}
@@ -613,69 +638,58 @@ export const ApplicantListView: React.FC<ApplicantListViewProps> = ({
                       {renderSortIcon('email')}
                     </button>
                   </th>
-                  <th className="py-2.5 px-3 whitespace-nowrap">
+                  <th className="py-2.5 px-3 min-w-[130px]">주소</th>
+                  <th className="py-2.5 px-3">
                     <button
                       type="button"
-                      onClick={() => onToggleSort('position')}
+                      onClick={() => onToggleSort('recruitmentCategory')}
                       className="inline-flex items-center gap-1 hover:text-slate-900 cursor-pointer"
                     >
-                      <span>지원 포지션</span>
-                      {renderSortIcon('position')}
+                      <span>모집구분</span>
+                      {renderSortIcon('recruitmentCategory')}
                     </button>
                   </th>
-                  <th className="py-2.5 px-3 whitespace-nowrap">
+                  <th className="py-2.5 px-3">편의지원</th>
+                  <th className="py-2.5 px-3">장애인</th>
+                  <th className="py-2.5 px-3">저소득</th>
+                  <th className="py-2.5 px-3">한국사</th>
+                  <th className="py-2.5 px-3 text-right">
                     <button
                       type="button"
-                      onClick={() => onToggleSort('source')}
-                      className="inline-flex items-center gap-1 hover:text-slate-900 cursor-pointer"
-                    >
-                      <span>지원 경로</span>
-                      {renderSortIcon('source')}
-                    </button>
-                  </th>
-                  <th className="py-2.5 px-3 whitespace-nowrap text-right">
-                    <button
-                      type="button"
-                      onClick={() => onToggleSort('experience')}
+                      onClick={() => onToggleSort('writtenScore')}
                       className="inline-flex items-center gap-1 hover:text-slate-900 ml-auto cursor-pointer"
                     >
-                      <span>경력</span>
-                      {renderSortIcon('experience')}
+                      <span>필기점수</span>
+                      {renderSortIcon('writtenScore')}
                     </button>
                   </th>
-                  <th className="py-2.5 px-3 whitespace-nowrap">
+                  <th className="py-2.5 px-3 text-right">
                     <button
                       type="button"
-                      onClick={() => onToggleSort('appliedDate')}
-                      className="inline-flex items-center gap-1 hover:text-slate-900 cursor-pointer"
+                      onClick={() => onToggleSort('interviewScore')}
+                      className="inline-flex items-center gap-1 hover:text-slate-900 ml-auto cursor-pointer"
                     >
-                      <span>지원일</span>
-                      {renderSortIcon('appliedDate')}
+                      <span>면접점수</span>
+                      {renderSortIcon('interviewScore')}
                     </button>
                   </th>
-                  <th className="py-2.5 px-3 whitespace-nowrap">
+                  <th className="py-2.5 px-3 text-center">
                     <button
                       type="button"
                       onClick={() => onToggleSort('status')}
                       className="inline-flex items-center gap-1 hover:text-slate-900 cursor-pointer"
                     >
-                      <span>상태</span>
+                      <span>최종합격여부</span>
                       {renderSortIcon('status')}
                     </button>
                   </th>
-                  <th className="py-2.5 px-3 whitespace-nowrap min-w-[170px]">
-                    태그
-                  </th>
-                  <th className="py-2.5 px-3 whitespace-nowrap min-w-[200px]">
-                    메모
-                  </th>
-                  <th className="py-2.5 px-3 whitespace-nowrap">
-                    경고 · 중복 표시
-                  </th>
+                  <th className="py-2.5 px-3 min-w-[140px]">태그</th>
+                  <th className="py-2.5 px-3 min-w-[150px]">비고</th>
+                  <th className="py-2.5 px-3">검증·중복</th>
                 </tr>
               </thead>
 
-              <tbody className="divide-y divide-slate-200 text-xs">
+              <tbody className="divide-y divide-slate-200">
                 {filteredApplicants.map((app) => {
                   const isChecked = selectedIds.has(app.id);
                   return (
@@ -688,6 +702,7 @@ export const ApplicantListView: React.FC<ApplicantListViewProps> = ({
                           : 'hover:bg-slate-50/80'
                       }`}
                     >
+                      {/* 체크박스 */}
                       <td
                         className="py-2.5 px-3 text-center"
                         onClick={(e) => e.stopPropagation()}
@@ -701,10 +716,12 @@ export const ApplicantListView: React.FC<ApplicantListViewProps> = ({
                         />
                       </td>
 
+                      {/* 성명 */}
                       <td className="py-2.5 px-3 font-semibold text-slate-900 whitespace-nowrap">
                         {app.name}
                       </td>
 
+                      {/* 연락처 */}
                       <td
                         className={`py-2.5 px-3 font-mono-tabular whitespace-nowrap ${
                           app.phoneValid
@@ -715,6 +732,12 @@ export const ApplicantListView: React.FC<ApplicantListViewProps> = ({
                         {app.phone || '-'}
                       </td>
 
+                      {/* 응시번호 */}
+                      <td className="py-2.5 px-3 font-mono-tabular font-medium text-slate-900 whitespace-nowrap">
+                        {app.examNumber}
+                      </td>
+
+                      {/* 이메일 */}
                       <td
                         className={`py-2.5 px-3 font-mono-tabular whitespace-nowrap ${
                           app.emailValid
@@ -725,34 +748,53 @@ export const ApplicantListView: React.FC<ApplicantListViewProps> = ({
                         {app.email || '-'}
                       </td>
 
+                      {/* 주소 */}
+                      <td className="py-2.5 px-3 text-slate-600 max-w-[160px] truncate" title={app.address}>
+                        {app.address || '-'}
+                      </td>
+
+                      {/* 모집구분 */}
                       <td className="py-2.5 px-3 text-slate-800 font-medium whitespace-nowrap">
-                        {app.position}
+                        {app.recruitmentCategory}
                       </td>
 
+                      {/* 편의지원 */}
                       <td className="py-2.5 px-3 text-slate-600 whitespace-nowrap">
-                        {app.source}
+                        {app.supportNeeds}
                       </td>
 
+                      {/* 장애인 */}
+                      <td className="py-2.5 px-3 text-slate-600 whitespace-nowrap">
+                        {app.disabilityStatus}
+                      </td>
+
+                      {/* 저소득 */}
+                      <td className="py-2.5 px-3 text-slate-600 whitespace-nowrap">
+                        {app.lowIncomeStatus}
+                      </td>
+
+                      {/* 한국사 */}
+                      <td className="py-2.5 px-3 text-slate-700 whitespace-nowrap font-medium">
+                        {app.historyScore}
+                      </td>
+
+                      {/* 필기점수 */}
                       <td className="py-2.5 px-3 text-right font-mono-tabular text-slate-800 whitespace-nowrap">
-                        {app.experience === 0 ? '신입(0)' : `${app.experience}년`}
+                        {app.writtenScore !== null ? app.writtenScore : '-'}
                       </td>
 
-                      <td
-                        className={`py-2.5 px-3 font-mono-tabular whitespace-nowrap ${
-                          app.appliedDateValid
-                            ? 'text-slate-600'
-                            : 'text-red-600 font-semibold'
-                        }`}
-                      >
-                        {app.appliedDate}
+                      {/* 면접점수 */}
+                      <td className="py-2.5 px-3 text-right font-mono-tabular text-slate-800 whitespace-nowrap">
+                        {app.interviewScore !== null ? app.interviewScore : '-'}
                       </td>
 
+                      {/* 최종합격여부 드롭다운 */}
                       <td
-                        className="py-2 px-3 whitespace-nowrap"
+                        className="py-2 px-3 whitespace-nowrap text-center"
                         onClick={(e) => e.stopPropagation()}
                       >
                         <select
-                          aria-label={`${app.name} 상태 변경`}
+                          aria-label={`${app.name} 최종합격여부 변경`}
                           value={app.status}
                           onChange={(e) =>
                             onUpdateApplicant(app.id, {
@@ -775,6 +817,7 @@ export const ApplicantListView: React.FC<ApplicantListViewProps> = ({
                         </select>
                       </td>
 
+                      {/* 태그 */}
                       <td
                         className="py-2 px-3"
                         onClick={(e) => e.stopPropagation()}
@@ -834,32 +877,34 @@ export const ApplicantListView: React.FC<ApplicantListViewProps> = ({
                         </div>
                       </td>
 
+                      {/* 비고(메모) */}
                       <td
                         className="py-2 px-3"
                         onClick={(e) => e.stopPropagation()}
                       >
                         <input
                           type="text"
-                          aria-label={`${app.name} 메모 입력`}
+                          aria-label={`${app.name} 비고 입력`}
                           value={app.memo}
                           onChange={(e) =>
                             onUpdateApplicant(app.id, { memo: e.target.value })
                           }
-                          placeholder="메모 입력..."
-                          className="w-full min-w-[180px] px-2 py-1 text-xs text-slate-700 bg-transparent border border-transparent hover:border-slate-200 focus:border-blue-400 focus:bg-white rounded focus:outline-none transition-colors"
+                          placeholder="비고 입력..."
+                          className="w-full min-w-[140px] px-2 py-1 text-xs text-slate-700 bg-transparent border border-transparent hover:border-slate-200 focus:border-blue-400 focus:bg-white rounded focus:outline-none transition-colors"
                         />
                       </td>
 
+                      {/* 검증 및 중복 */}
                       <td className="py-2.5 px-3 whitespace-nowrap">
                         <div className="flex items-center gap-1.5 text-xs">
                           {app.isSamePositionDuplicate && (
                             <span className="text-amber-700 font-semibold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
-                              중복 지원
+                              동일직렬 중복
                             </span>
                           )}
                           {app.isMultiPositionApplicant && (
                             <span className="text-blue-700 font-semibold bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
-                              복수 포지션 지원
+                              복수 응시
                             </span>
                           )}
                           {app.warnings.map((w) => (

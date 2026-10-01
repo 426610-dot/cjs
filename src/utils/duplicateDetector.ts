@@ -5,44 +5,62 @@ import {
   ImportSummary,
 } from '../types/applicant';
 import {
-  normalizeDate,
   normalizeEmail,
-  normalizeExperience,
+  normalizeExamNumber,
+  normalizeFinalResult,
   normalizeName,
   normalizePhone,
+  normalizeScore,
 } from './normalizers';
 
 export interface RawApplicantInput {
   id?: string;
   name?: unknown;
   phone?: unknown;
+  examNumber?: unknown;
   email?: unknown;
-  position?: unknown;
-  source?: unknown;
-  experience?: unknown;
-  appliedDate?: unknown;
-  memo?: unknown;
+  address?: unknown;
+  recruitmentCategory?: unknown;
+  supportNeeds?: unknown;
+  disabilityStatus?: unknown;
+  lowIncomeStatus?: unknown;
+  historyScore?: unknown;
+  writtenScore?: unknown;
+  interviewScore?: unknown;
+  finalResult?: unknown;
   status?: ApplicantStatus;
   tags?: string[];
+  memo?: unknown;
   sourceFileName?: string;
 }
 
 export function buildNormalizedApplicant(input: RawApplicantInput): Applicant {
-  const name = normalizeName(input.name) || '이름 미기재';
+  const name = normalizeName(input.name) || '성명 미기재';
   const phoneResult = normalizePhone(input.phone);
   const emailResult = normalizeEmail(input.email);
-  const expResult = normalizeExperience(input.experience);
-  const dateResult = normalizeDate(input.appliedDate);
+  const examNumber = normalizeExamNumber(input.examNumber) || '-';
 
-  const position = normalizeName(input.position) || '미지정 포지션';
-  const source = normalizeName(input.source) || '기타/직접지원';
+  const address = input.address !== null && input.address !== undefined ? String(input.address).trim() : '';
+  const recruitmentCategory = normalizeName(input.recruitmentCategory) || '일반행정';
+  const supportNeeds = input.supportNeeds !== null && input.supportNeeds !== undefined ? String(input.supportNeeds).trim() : '해당없음';
+  const disabilityStatus = input.disabilityStatus !== null && input.disabilityStatus !== undefined ? String(input.disabilityStatus).trim() : '비대상';
+  const lowIncomeStatus = input.lowIncomeStatus !== null && input.lowIncomeStatus !== undefined ? String(input.lowIncomeStatus).trim() : '비대상';
+  const historyScore = input.historyScore !== null && input.historyScore !== undefined ? String(input.historyScore).trim() : '해당없음';
+
+  const writtenScore = normalizeScore(input.writtenScore);
+  const interviewScore = normalizeScore(input.interviewScore);
+
+  let status: ApplicantStatus = input.status || '심사 중';
+  if (input.finalResult !== undefined && input.finalResult !== null) {
+    status = normalizeFinalResult(input.finalResult);
+  }
+
   const memo = input.memo !== null && input.memo !== undefined ? String(input.memo).trim() : '';
 
   const warnings: string[] = [];
   if (!phoneResult.isValid && phoneResult.warning) warnings.push(phoneResult.warning);
   if (!emailResult.isValid && emailResult.warning) warnings.push(emailResult.warning);
-  if (!expResult.isValid && expResult.warning) warnings.push(expResult.warning);
-  if (!dateResult.isValid && dateResult.warning) warnings.push(dateResult.warning);
+  if (examNumber === '-' || !examNumber) warnings.push('응시번호 미기재');
 
   return {
     id: input.id || `app_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
@@ -50,18 +68,21 @@ export function buildNormalizedApplicant(input: RawApplicantInput): Applicant {
     phone: phoneResult.value,
     rawPhone: input.phone !== undefined ? String(input.phone) : undefined,
     phoneValid: phoneResult.isValid,
+    examNumber,
     email: emailResult.value,
     rawEmail: input.email !== undefined ? String(input.email) : undefined,
     emailValid: emailResult.isValid,
-    position,
-    source,
-    experience: expResult.value,
-    rawExperience: input.experience !== undefined ? String(input.experience) : undefined,
-    experienceValid: expResult.isValid,
-    appliedDate: dateResult.value,
-    rawAppliedDate: input.appliedDate !== undefined ? String(input.appliedDate) : undefined,
-    appliedDateValid: dateResult.isValid,
-    status: input.status || '검토 전',
+    address,
+    recruitmentCategory,
+    supportNeeds,
+    disabilityStatus,
+    lowIncomeStatus,
+    historyScore,
+    writtenScore,
+    rawWrittenScore: input.writtenScore !== undefined ? String(input.writtenScore) : undefined,
+    interviewScore,
+    rawInterviewScore: input.interviewScore !== undefined ? String(input.interviewScore) : undefined,
+    status,
     tags: input.tags ? [...input.tags] : [],
     memo,
     sourceFileName: input.sourceFileName,
@@ -90,12 +111,26 @@ export function getEmailComparisonKey(email: string): string | null {
   return null;
 }
 
-export function getPositionComparisonKey(position: string): string {
-  return (position || '').replace(/\s+/g, '').toLowerCase();
+export function getExamNumberComparisonKey(examNumber: string): string | null {
+  const clean = (examNumber || '').trim().toUpperCase();
+  if (clean && clean !== '-') {
+    return clean;
+  }
+  return null;
+}
+
+export function getCategoryComparisonKey(category: string): string {
+  return (category || '').replace(/\s+/g, '').toLowerCase();
 }
 
 export function isSamePerson(a: Applicant, b: Applicant): boolean {
   if (a.id === b.id) return false;
+
+  const examA = getExamNumberComparisonKey(a.examNumber);
+  const examB = getExamNumberComparisonKey(b.examNumber);
+  if (examA && examB && examA === examB) {
+    return true;
+  }
 
   const phoneA = getPhoneComparisonKey(a.phone);
   const phoneB = getPhoneComparisonKey(b.phone);
@@ -116,12 +151,11 @@ export function recomputeApplicantsMetadata(applicants: Applicant[]): Applicant[
   const updated = applicants.map((app) => {
     const phoneCheck = normalizePhone(app.phone);
     const emailCheck = normalizeEmail(app.email);
-    const dateCheck = normalizeDate(app.appliedDate);
 
     const warnings: string[] = [];
     if (!phoneCheck.isValid && phoneCheck.warning) warnings.push(phoneCheck.warning);
     if (!emailCheck.isValid && emailCheck.warning) warnings.push(emailCheck.warning);
-    if (!dateCheck.isValid && dateCheck.warning) warnings.push(dateCheck.warning);
+    if (!app.examNumber || app.examNumber === '-') warnings.push('응시번호 미기재');
 
     return {
       ...app,
@@ -129,8 +163,6 @@ export function recomputeApplicantsMetadata(applicants: Applicant[]): Applicant[
       phoneValid: phoneCheck.isValid,
       email: emailCheck.isValid ? emailCheck.value : app.email,
       emailValid: emailCheck.isValid,
-      appliedDate: dateCheck.isValid ? dateCheck.value : app.appliedDate,
-      appliedDateValid: dateCheck.isValid,
       warnings,
       hasFormatError: warnings.length > 0,
       isSamePositionDuplicate: false,
@@ -141,7 +173,7 @@ export function recomputeApplicantsMetadata(applicants: Applicant[]): Applicant[
 
   for (let i = 0; i < updated.length; i++) {
     const a = updated[i];
-    const posA = getPositionComparisonKey(a.position);
+    const catA = getCategoryComparisonKey(a.recruitmentCategory);
 
     for (let j = i + 1; j < updated.length; j++) {
       const b = updated[j];
@@ -149,8 +181,8 @@ export function recomputeApplicantsMetadata(applicants: Applicant[]): Applicant[
         a.relatedApplicantIds.push(b.id);
         b.relatedApplicantIds.push(a.id);
 
-        const posB = getPositionComparisonKey(b.position);
-        if (posA === posB) {
+        const catB = getCategoryComparisonKey(b.recruitmentCategory);
+        if (catA === catB) {
           a.isSamePositionDuplicate = true;
           b.isSamePositionDuplicate = true;
         } else {
@@ -201,9 +233,9 @@ export function processApplicantImport(
       continue;
     }
 
-    const candidatePosKey = getPositionComparisonKey(candidate.position);
+    const candidateCatKey = getCategoryComparisonKey(candidate.recruitmentCategory);
     const samePositionTarget = samePersonMatches.find(
-      (existing) => getPositionComparisonKey(existing.position) === candidatePosKey
+      (existing) => getCategoryComparisonKey(existing.recruitmentCategory) === candidateCatKey
     );
 
     if (samePositionTarget) {
@@ -217,15 +249,20 @@ export function processApplicantImport(
           samePositionTarget.email = candidate.email;
           samePositionTarget.emailValid = true;
         }
-        if (samePositionTarget.experience === 0 && candidate.experience > 0) {
-          samePositionTarget.experience = candidate.experience;
+        if ((!samePositionTarget.examNumber || samePositionTarget.examNumber === '-') && candidate.examNumber) {
+          samePositionTarget.examNumber = candidate.examNumber;
         }
-        if (
-          candidate.source &&
-          candidate.source !== '기타/직접지원' &&
-          !samePositionTarget.source.includes(candidate.source)
-        ) {
-          samePositionTarget.source = `${samePositionTarget.source} / ${candidate.source}`;
+        if (!samePositionTarget.address && candidate.address) {
+          samePositionTarget.address = candidate.address;
+        }
+        if (samePositionTarget.writtenScore === null && candidate.writtenScore !== null) {
+          samePositionTarget.writtenScore = candidate.writtenScore;
+        }
+        if (samePositionTarget.interviewScore === null && candidate.interviewScore !== null) {
+          samePositionTarget.interviewScore = candidate.interviewScore;
+        }
+        if (candidate.status !== '심사 중' && samePositionTarget.status === '심사 중') {
+          samePositionTarget.status = candidate.status;
         }
         if (candidate.memo && !samePositionTarget.memo.includes(candidate.memo)) {
           samePositionTarget.memo = samePositionTarget.memo

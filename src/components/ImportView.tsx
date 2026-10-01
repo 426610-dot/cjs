@@ -24,7 +24,7 @@ import {
 } from '../utils/excelService';
 import {
   buildNormalizedApplicant,
-  getPositionComparisonKey,
+  getCategoryComparisonKey,
   isSamePerson,
   RawApplicantInput,
 } from '../utils/duplicateDetector';
@@ -172,7 +172,11 @@ export const ImportView: React.FC<ImportViewProps> = ({
         }
 
         const hasAnyValue =
-          rawInput.name || rawInput.phone || rawInput.email || rawInput.position;
+          rawInput.name ||
+          rawInput.phone ||
+          rawInput.examNumber ||
+          rawInput.email ||
+          rawInput.recruitmentCategory;
         if (hasAnyValue) {
           result.push({ raw: rawInput, sheetName: sheet.fileName });
         }
@@ -204,11 +208,11 @@ export const ImportView: React.FC<ImportViewProps> = ({
 
       let duplicateStatus: 'new' | 'same_pos_dup' | 'multi_pos' = 'new';
       if (samePeople.length > 0) {
-        const posKey = getPositionComparisonKey(normalized.position);
-        const samePos = samePeople.some(
-          (p) => getPositionComparisonKey(p.position) === posKey
+        const catKey = getCategoryComparisonKey(normalized.recruitmentCategory);
+        const sameCat = samePeople.some(
+          (p) => getCategoryComparisonKey(p.recruitmentCategory) === catKey
         );
-        duplicateStatus = samePos ? 'same_pos_dup' : 'multi_pos';
+        duplicateStatus = sameCat ? 'same_pos_dup' : 'multi_pos';
       }
 
       comparisonPool.push(normalized);
@@ -225,7 +229,7 @@ export const ImportView: React.FC<ImportViewProps> = ({
   const handleConfirm = () => {
     if (allMappedRawInputs.length === 0) {
       setErrorMessage(
-        '가져올 수 있는 유효한 지원자 행이 없습니다. 이름·연락처·이메일 등의 열 매핑을 확인해 주세요.'
+        '가져올 수 있는 유효한 응시자 행이 없습니다. 성명·연락처·응시번호 등의 열 매핑을 확인해 주세요.'
       );
       return;
     }
@@ -243,17 +247,17 @@ export const ImportView: React.FC<ImportViewProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* 상단 안내 및 빠른 시작 배너 (파란색 테마) */}
+      {/* 상단 안내 배너 */}
       <div className="bg-white border border-slate-200 shadow-xs rounded-lg p-5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-blue-600 inline-block"></span>
+            <span className="w-2.5 h-2.5 rounded-full bg-blue-600 inline-block"></span>
             <h1 className="text-lg font-semibold text-slate-900">
-              지원자 엑셀·CSV 파일 가져오기
+              응시자 엑셀·CSV 파일 가져오기
             </h1>
           </div>
           <p className="text-sm text-slate-600 mt-1">
-            원티드, 사람인, 잡코리아 등 채용 사이트 엑셀을 업로드하면 이름, 연락처(010-XXXX-XXXX), 이메일, 경력, 지원일을 표준 형식으로 자동 정리합니다.
+            성명, 연락처, 응시번호, 이메일, 주소, 모집구분, 편의지원, 장애인, 저소득, 한국사, 필기점수, 면접점수, 최종합격여부 등 13개 항목을 표준 양식으로 자동 정제·정리합니다.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2.5 shrink-0">
@@ -279,7 +283,7 @@ export const ImportView: React.FC<ImportViewProps> = ({
               onClick={onLoadSampleApplicants}
               className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors whitespace-nowrap cursor-pointer shadow-xs"
             >
-              샘플 지원자 22명 바로 불러오기
+              샘플 응시자 22명 바로 불러오기
             </button>
           )}
         </div>
@@ -306,7 +310,7 @@ export const ImportView: React.FC<ImportViewProps> = ({
         </div>
       )}
 
-      {/* 가져오기 완료 요약 카드 (파란색 포인트) */}
+      {/* 가져오기 완료 요약 */}
       {lastSummary && (
         <div className="bg-blue-50/60 border border-blue-200 rounded-lg p-5">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -314,7 +318,7 @@ export const ImportView: React.FC<ImportViewProps> = ({
               <CheckCircle2 className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
               <div>
                 <h2 className="text-base font-semibold text-slate-900">
-                  지원자 데이터 가져오기가 완료되었습니다 ({lastSummary.timestamp})
+                  응시자 데이터 가져오기가 완료되었습니다 ({lastSummary.timestamp})
                 </h2>
                 <p className="text-xs text-slate-600 mt-0.5">
                   처리된 파일: {lastSummary.fileNames.join(', ')}
@@ -326,7 +330,7 @@ export const ImportView: React.FC<ImportViewProps> = ({
               onClick={onNavigateToList}
               className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors whitespace-nowrap self-start md:self-auto cursor-pointer shadow-xs"
             >
-              지원자 목록에서 확인하기
+              응시자 목록에서 확인하기
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>
@@ -345,12 +349,12 @@ export const ImportView: React.FC<ImportViewProps> = ({
               </div>
               {lastSummary.multiPositionCount > 0 && (
                 <div className="text-xs text-slate-500 mt-0.5 tabular-nums">
-                  복수 포지션 지원 {lastSummary.multiPositionCount}명 포함
+                  복수 모집구분 지원 {lastSummary.multiPositionCount}명 포함
                 </div>
               )}
             </div>
             <div className="bg-white border border-slate-200 rounded-md p-3">
-              <div className="text-xs text-slate-500">동일 포지션 중복</div>
+              <div className="text-xs text-slate-500">동일 모집구분 중복</div>
               <div className="text-xl font-semibold text-amber-700 mt-1 tabular-nums">
                 중복 {lastSummary.duplicateCount}명
               </div>
@@ -359,7 +363,7 @@ export const ImportView: React.FC<ImportViewProps> = ({
               </div>
             </div>
             <div className="bg-white border border-slate-200 rounded-md p-3">
-              <div className="text-xs text-slate-500">연락처·이메일 형식 오류</div>
+              <div className="text-xs text-slate-500">연락처·이메일·응시번호 오류</div>
               <div className="text-xl font-semibold text-red-600 mt-1 tabular-nums">
                 형식 오류 {lastSummary.formatErrorCount}명
               </div>
@@ -371,7 +375,7 @@ export const ImportView: React.FC<ImportViewProps> = ({
         </div>
       )}
 
-      {/* 1단계: 드래그앤드롭 업로드 영역 (파란색 테두리/포인트) */}
+      {/* 1단계: 드래그앤드롭 업로드 */}
       <div
         onDragOver={(e) => {
           e.preventDefault();
@@ -406,7 +410,7 @@ export const ImportView: React.FC<ImportViewProps> = ({
           엑셀(.xlsx, .xls) 또는 CSV 파일을 이곳에 끌어다 놓거나 클릭하여 선택하세요
         </p>
         <p className="text-xs text-slate-500 mt-1">
-          여러 개의 채용 사이트 파일을 동시에 업로드하여 하나의 표준 포맷으로 병합할 수 있습니다
+          채용 원서 접수 파일들을 동시에 업로드하여 표준 13개 항목으로 자동 매핑·정리할 수 있습니다
         </p>
       </div>
 
@@ -417,17 +421,16 @@ export const ImportView: React.FC<ImportViewProps> = ({
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 pb-4 border-b border-slate-200">
               <div>
                 <h2 className="text-base font-semibold text-slate-900">
-                  1. 업로드된 파일 및 열 매핑 설정
+                  1. 업로드된 파일 및 13개 항목 열 매핑
                 </h2>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  파일의 열 이름을 분석하여 표준 항목을 자동 추천했습니다. 필요 시 드롭다운에서 변경하세요.
+                  파일의 열 이름을 보고 13개 표준 항목을 자동 추천했습니다. 변경이 필요한 경우 드롭다운에서 선택하세요.
                 </p>
               </div>
 
-              {/* 중복 지원 처리 방식 */}
               <div className="flex flex-wrap items-center gap-3 bg-slate-50 px-3.5 py-2.5 rounded-md border border-slate-200">
                 <span className="text-xs font-semibold text-slate-700">
-                  동일 포지션 중복 지원자 처리:
+                  동일 모집구분 중복 접수자 처리:
                 </span>
                 <label className="inline-flex items-center gap-1.5 text-xs text-slate-800 cursor-pointer">
                   <input
@@ -437,7 +440,7 @@ export const ImportView: React.FC<ImportViewProps> = ({
                     onChange={() => setDuplicateMode('merge')}
                     className="accent-blue-600"
                   />
-                  <span>기존 정보에 병합 (추천)</span>
+                  <span>기존 정보에 병합 (점수·주소 보완)</span>
                 </label>
                 <label className="inline-flex items-center gap-1.5 text-xs text-slate-800 cursor-pointer">
                   <input
@@ -452,7 +455,7 @@ export const ImportView: React.FC<ImportViewProps> = ({
               </div>
             </div>
 
-            {/* 업로드 파일 탭 */}
+            {/* 파일 탭 */}
             <div className="flex flex-wrap items-center gap-2">
               {parsedSheets.map((sheet) => {
                 const isActive = sheet.id === activeSheet.id;
@@ -556,14 +559,14 @@ export const ImportView: React.FC<ImportViewProps> = ({
                       }
                       className={`w-full text-xs font-medium rounded-md px-2.5 py-1.5 border focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                         mappedValue !== 'ignore'
-                          ? 'bg-white border-blue-300 text-slate-900'
+                          ? 'bg-white border-blue-300 text-slate-900 font-semibold'
                           : 'bg-white border-slate-300 text-slate-500'
                       }`}
                     >
                       <option value="ignore">사용 안 함 (제외)</option>
                       {STANDARD_FIELDS.map((field) => (
                         <option key={field.key} value={field.key}>
-                          표준 항목: {field.label}
+                          표준: {field.label} {field.required ? '*' : ''}
                         </option>
                       ))}
                     </select>
@@ -574,14 +577,14 @@ export const ImportView: React.FC<ImportViewProps> = ({
           </div>
 
           {/* 3단계: 매핑 미리보기 표 */}
-          <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+          <div className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-xs">
             <div className="px-5 py-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div>
                 <h2 className="text-base font-semibold text-slate-900">
-                  2. 자동 정리 및 매핑 결과 미리보기 ({activeSheet.fileName} · 상위 {previewRows.length}행)
+                  2. 13개 항목 자동 정리 및 매핑 결과 미리보기 ({activeSheet.fileName} · 상위 {previewRows.length}행)
                 </h2>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  이름 공백 정리, 010-XXXX-XXXX 하이픈 통일, 이메일 정규화, 경력 숫자 변환, YYYY-MM-DD 날짜 서식이 적용된 미리보기입니다.
+                  성명·연락처·응시번호·이메일·주소·모집구분·편의지원·장애인·저소득·한국사·필기·면접·최종합격여부로 정리된 미리보기입니다.
                 </p>
               </div>
               <div className="flex items-center gap-3 shrink-0">
@@ -600,22 +603,27 @@ export const ImportView: React.FC<ImportViewProps> = ({
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
+              <table className="w-full text-left border-collapse text-xs">
                 <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-600">
-                    <th className="py-2.5 px-3 w-12 text-center">#</th>
-                    <th className="py-2.5 px-3">이름</th>
-                    <th className="py-2.5 px-3">연락처 (자동정리)</th>
-                    <th className="py-2.5 px-3">이메일 (자동정리)</th>
-                    <th className="py-2.5 px-3">지원 포지션</th>
-                    <th className="py-2.5 px-3">지원 경로</th>
-                    <th className="py-2.5 px-3 text-right">경력(년)</th>
-                    <th className="py-2.5 px-3">지원일</th>
-                    <th className="py-2.5 px-3">기타 메모</th>
+                  <tr className="bg-slate-50 border-b border-slate-200 font-semibold text-slate-600 whitespace-nowrap">
+                    <th className="py-2.5 px-3 w-10 text-center">#</th>
+                    <th className="py-2.5 px-3">성명</th>
+                    <th className="py-2.5 px-3">연락처</th>
+                    <th className="py-2.5 px-3">응시번호</th>
+                    <th className="py-2.5 px-3">이메일</th>
+                    <th className="py-2.5 px-3">주소</th>
+                    <th className="py-2.5 px-3">모집구분</th>
+                    <th className="py-2.5 px-3">편의지원</th>
+                    <th className="py-2.5 px-3">장애인</th>
+                    <th className="py-2.5 px-3">저소득</th>
+                    <th className="py-2.5 px-3">한국사</th>
+                    <th className="py-2.5 px-3 text-right">필기점수</th>
+                    <th className="py-2.5 px-3 text-right">면접점수</th>
+                    <th className="py-2.5 px-3 text-center">최종합격여부</th>
                     <th className="py-2.5 px-3">판정 미리보기</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-200 text-xs">
+                <tbody className="divide-y divide-slate-200">
                   {previewRows.map(({ rowNumber, normalized, duplicateStatus }) => (
                     <tr key={rowNumber} className="hover:bg-slate-50/80">
                       <td className="py-2.5 px-3 text-center text-slate-400 font-mono-tabular">
@@ -631,6 +639,9 @@ export const ImportView: React.FC<ImportViewProps> = ({
                       >
                         {normalized.phone || '-'}
                       </td>
+                      <td className="py-2.5 px-3 font-mono-tabular font-medium text-slate-800 whitespace-nowrap">
+                        {normalized.examNumber}
+                      </td>
                       <td
                         className={`py-2.5 px-3 font-mono-tabular whitespace-nowrap ${
                           normalized.emailValid ? 'text-slate-800' : 'text-red-600 font-semibold'
@@ -638,35 +649,55 @@ export const ImportView: React.FC<ImportViewProps> = ({
                       >
                         {normalized.email || '-'}
                       </td>
-                      <td className="py-2.5 px-3 text-slate-800 whitespace-nowrap">
-                        {normalized.position}
+                      <td className="py-2.5 px-3 text-slate-600 max-w-[150px] truncate" title={normalized.address}>
+                        {normalized.address || '-'}
+                      </td>
+                      <td className="py-2.5 px-3 text-slate-800 font-medium whitespace-nowrap">
+                        {normalized.recruitmentCategory}
                       </td>
                       <td className="py-2.5 px-3 text-slate-600 whitespace-nowrap">
-                        {normalized.source}
+                        {normalized.supportNeeds}
+                      </td>
+                      <td className="py-2.5 px-3 text-slate-600 whitespace-nowrap">
+                        {normalized.disabilityStatus}
+                      </td>
+                      <td className="py-2.5 px-3 text-slate-600 whitespace-nowrap">
+                        {normalized.lowIncomeStatus}
+                      </td>
+                      <td className="py-2.5 px-3 text-slate-700 whitespace-nowrap">
+                        {normalized.historyScore}
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono-tabular text-slate-800 whitespace-nowrap">
-                        {normalized.experience === 0 ? '신입(0)' : `${normalized.experience}년`}
+                        {normalized.writtenScore !== null ? normalized.writtenScore : '-'}
                       </td>
-                      <td
-                        className={`py-2.5 px-3 font-mono-tabular whitespace-nowrap ${
-                          normalized.appliedDateValid ? 'text-slate-700' : 'text-red-600 font-semibold'
-                        }`}
-                      >
-                        {normalized.appliedDate}
+                      <td className="py-2.5 px-3 text-right font-mono-tabular text-slate-800 whitespace-nowrap">
+                        {normalized.interviewScore !== null ? normalized.interviewScore : '-'}
                       </td>
-                      <td className="py-2.5 px-3 text-slate-600 max-w-[200px] truncate">
-                        {normalized.memo || '-'}
+                      <td className="py-2.5 px-3 text-center whitespace-nowrap font-semibold">
+                        <span
+                          className={
+                            normalized.status === '최종 합격'
+                              ? 'text-emerald-700'
+                              : normalized.status === '예비 합격'
+                              ? 'text-amber-700'
+                              : normalized.status === '불합격'
+                              ? 'text-rose-700'
+                              : 'text-slate-600'
+                          }
+                        >
+                          {normalized.status}
+                        </span>
                       </td>
                       <td className="py-2.5 px-3 whitespace-nowrap">
                         <div className="flex items-center gap-1.5 text-xs">
                           {duplicateStatus === 'same_pos_dup' && (
                             <span className="text-amber-700 font-semibold">
-                              중복 지원 ({duplicateMode === 'merge' ? '병합' : '제외'})
+                              중복 접수 ({duplicateMode === 'merge' ? '병합' : '제외'})
                             </span>
                           )}
                           {duplicateStatus === 'multi_pos' && (
                             <span className="text-blue-700 font-semibold">
-                              복수 포지션 지원
+                              복수 지원
                             </span>
                           )}
                           {duplicateStatus === 'new' && !normalized.hasFormatError && (

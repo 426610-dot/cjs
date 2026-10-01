@@ -1,10 +1,5 @@
-import { ColumnMapping, StandardFieldKey } from '../types/applicant';
+import { ApplicantStatus, ColumnMapping, StandardFieldKey } from '../types/applicant';
 
-/**
- * 1. 이름 정리 규칙
- * - 앞뒤 공백 제거
- * - 중간 연속 공백(탭, 줄바꿈 포함)을 단일 공백(' ')으로 통일
- */
 export function normalizeName(raw: unknown): string {
   if (raw === null || raw === undefined) return '';
   const str = String(raw).trim();
@@ -12,13 +7,6 @@ export function normalizeName(raw: unknown): string {
   return str.replace(/\s+/g, ' ');
 }
 
-/**
- * 2. 연락처 정리 규칙
- * - 숫자만 추출 후 010-1234-5678 형식으로 통일
- * - +82, 82-10, 공백, 하이픈, 점(.), 괄호 등 혼재 처리
- * - 엑셀에서 앞자리 0이 잘린 1012345678 형태도 010-1234-5678로 복원
- * - 자릿수나 시작 번호가 맞지 않으면 "연락처 형식 오류" 경고 반환
- */
 export function normalizePhone(raw: unknown): {
   value: string;
   isValid: boolean;
@@ -79,11 +67,6 @@ export function normalizePhone(raw: unknown): {
   };
 }
 
-/**
- * 3. 이메일 정리 규칙
- * - 모든 공백 제거 및 소문자 변환
- * - 표준 이메일 정규식 검증 (오류 시 "이메일 형식 오류" 경고)
- */
 export function normalizeEmail(raw: unknown): {
   value: string;
   isValid: boolean;
@@ -112,198 +95,91 @@ export function normalizeEmail(raw: unknown): {
   return { value: cleaned, isValid: true };
 }
 
-/**
- * 4. 경력(년) 정리 규칙
- * - "신입", "무관", "인턴" -> 0
- * - "3년 6개월" -> 3.5
- * - "18개월" -> 1.5
- * - "3년", "3.5" -> 3, 3.5
- */
-export function normalizeExperience(raw: unknown): {
-  value: number;
-  isValid: boolean;
-  warning?: string;
-} {
-  if (raw === null || raw === undefined) {
-    return { value: 0, isValid: true };
-  }
-
-  if (typeof raw === 'number' && !Number.isNaN(raw)) {
-    const rounded = Math.max(0, Math.round(raw * 10) / 10);
-    return { value: rounded, isValid: true };
-  }
-
-  const str = String(raw).trim();
-  if (!str || str === '-') {
-    return { value: 0, isValid: true };
-  }
-
-  if (/신입|초보|인턴|무관|없음|entry|new|junior/i.test(str) && !/\d/.test(str)) {
-    return { value: 0, isValid: true };
-  }
-
-  const yearMonthMatch = str.match(/(\d+(?:\.\d+)?)\s*년\s*(\d+)\s*개?월/);
-  if (yearMonthMatch) {
-    const years = parseFloat(yearMonthMatch[1]);
-    const months = parseFloat(yearMonthMatch[2]);
-    const total = Math.round((years + months / 12) * 10) / 10;
-    return { value: total, isValid: true };
-  }
-
-  const monthOnlyMatch = str.match(/^약?\s*(\d+)\s*개?월$/);
-  if (monthOnlyMatch) {
-    const months = parseFloat(monthOnlyMatch[1]);
-    const total = Math.round((months / 12) * 10) / 10;
-    return { value: total, isValid: true };
-  }
-
-  const numberMatch = str.match(/(\d+(?:\.\d+)?)/);
-  if (numberMatch) {
-    const num = parseFloat(numberMatch[1]);
-    if (!Number.isNaN(num) && num >= 0 && num <= 60) {
-      return { value: Math.round(num * 10) / 10, isValid: true };
-    }
-  }
-
-  return {
-    value: 0,
-    isValid: false,
-    warning: `경력 표기 확인 필요 (${str})`,
-  };
+export function normalizeExamNumber(raw: unknown): string {
+  if (raw === null || raw === undefined) return '';
+  return String(raw).trim().toUpperCase();
 }
 
-/**
- * 5. 지원일 정리 규칙
- * - 엑셀 시리얼 날짜, "2026.09.15", "2026/9/5", "26-09-15" 등을 YYYY-MM-DD로 통일
- */
-export function normalizeDate(raw: unknown): {
-  value: string;
-  isValid: boolean;
-  warning?: string;
-} {
-  const todayFallback = new Date().toISOString().slice(0, 10);
-
-  if (raw === null || raw === undefined || String(raw).trim() === '') {
-    return { value: todayFallback, isValid: true };
-  }
-
-  if (raw instanceof Date && !Number.isNaN(raw.getTime())) {
-    return {
-      value: formatDateParts(raw.getFullYear(), raw.getMonth() + 1, raw.getDate()),
-      isValid: true,
-    };
-  }
-
-  if (typeof raw === 'number' || /^\d{5}(?:\.\d+)?$/.test(String(raw).trim())) {
-    const serial = Number(raw);
-    if (serial > 30000 && serial < 70000) {
-      const utcDays = Math.floor(serial - 25569);
-      const dateObj = new Date(utcDays * 86400 * 1000);
-      if (!Number.isNaN(dateObj.getTime())) {
-        return {
-          value: formatDateParts(
-            dateObj.getUTCFullYear(),
-            dateObj.getUTCMonth() + 1,
-            dateObj.getUTCDate()
-          ),
-          isValid: true,
-        };
-      }
-    }
-  }
-
-  const str = String(raw).trim();
-
-  const eightDigit = str.match(/^(\d{4})(\d{2})(\d{2})$/);
-  if (eightDigit) {
-    const y = parseInt(eightDigit[1], 10);
-    const m = parseInt(eightDigit[2], 10);
-    const d = parseInt(eightDigit[3], 10);
-    if (isValidCalendarDate(y, m, d)) {
-      return { value: formatDateParts(y, m, d), isValid: true };
-    }
-  }
-
-  const ymdMatch = str.match(/^(\d{2,4})\s*[-./년]\s*(\d{1,2})\s*[-./월]\s*(\d{1,2})/);
-  if (ymdMatch) {
-    let y = parseInt(ymdMatch[1], 10);
-    if (y < 100) {
-      y += y >= 70 ? 1900 : 2000;
-    }
-    const m = parseInt(ymdMatch[2], 10);
-    const d = parseInt(ymdMatch[3], 10);
-    if (isValidCalendarDate(y, m, d)) {
-      return { value: formatDateParts(y, m, d), isValid: true };
-    }
-  }
-
-  const parsed = new Date(str);
-  if (!Number.isNaN(parsed.getTime())) {
-    const y = parsed.getFullYear();
-    const m = parsed.getMonth() + 1;
-    const d = parsed.getDate();
-    if (isValidCalendarDate(y, m, d)) {
-      return { value: formatDateParts(y, m, d), isValid: true };
-    }
-  }
-
-  return {
-    value: str,
-    isValid: false,
-    warning: '지원일 형식 오류',
-  };
+export function normalizeScore(raw: unknown): number | null {
+  if (raw === null || raw === undefined) return null;
+  const str = String(raw).trim().replace(/[점%]/g, '');
+  if (!str || str === '-' || str === '미응시' || str === '결시') return null;
+  const num = parseFloat(str);
+  if (Number.isNaN(num)) return null;
+  return Math.round(num * 100) / 100;
 }
 
-function isValidCalendarDate(year: number, month: number, day: number): boolean {
-  if (year < 1990 || year > 2100) return false;
-  if (month < 1 || month > 12) return false;
-  if (day < 1 || day > 31) return false;
-  const dt = new Date(year, month - 1, day);
-  return (
-    dt.getFullYear() === year &&
-    dt.getMonth() === month - 1 &&
-    dt.getDate() === day
-  );
-}
-
-function formatDateParts(year: number, month: number, day: number): string {
-  const mm = String(month).padStart(2, '0');
-  const dd = String(day).padStart(2, '0');
-  return `${year}-${mm}-${dd}`;
+export function normalizeFinalResult(raw: unknown): ApplicantStatus {
+  if (raw === null || raw === undefined) return '심사 중';
+  const str = String(raw).trim().toLowerCase();
+  if (/최종\s*합격|합격|pass|success/i.test(str) && !/불합격/i.test(str)) {
+    return '최종 합격';
+  }
+  if (/예비\s*합격|예비|후보|wait/i.test(str)) {
+    return '예비 합격';
+  }
+  if (/불합격|탈락|fail|reject/i.test(str)) {
+    return '불합격';
+  }
+  return '심사 중';
 }
 
 const FIELD_PATTERNS: { field: StandardFieldKey; keywords: RegExp }[] = [
   {
     field: 'name',
-    keywords: /^(성명|이름|지원자명|지원자\s*성명|지원자|한글\s*이름|성함|후보자명|name|full\s*name|applicant|candidate)$/i,
+    keywords: /^(성명|이름|지원자명|응시자명|후보자명|성함|name|full\s*name)$/i,
   },
   {
     field: 'phone',
-    keywords: /(휴대폰|휴대전화|전화번호|연락처|핸드폰|전화|모바일|phone|mobile|cell|tel|h\.?p|contact)/i,
+    keywords: /(휴대폰|휴대전화|전화번호|연락처|핸드폰|전화|모바일|phone|mobile|tel|contact)/i,
+  },
+  {
+    field: 'examNumber',
+    keywords: /(응시\s*번호|수험\s*번호|접수\s*번호|응시자\s*번호|접수\s*id|exam\s*no|application\s*no|registration\s*no)/i,
   },
   {
     field: 'email',
-    keywords: /(e-?mail|이메일|메일주소|메일|전자우편|mail)/i,
+    keywords: /(e-?mail|이메일|메일주소|메일|전자우편)/i,
   },
   {
-    field: 'position',
-    keywords: /(지원\s*포지션|지원\s*직무|지원\s*부문|지원\s*분야|모집\s*부문|직무|포지션|공고명|채용\s*공고|희망\s*직무|position|role|job\s*title|department)/i,
+    field: 'address',
+    keywords: /(주소|주민등록\s*주소|도로명\s*주소|거주지|거주\s*주소|소재지|address)/i,
   },
   {
-    field: 'source',
-    keywords: /(지원\s*경로|유입\s*경로|채용\s*사이트|채용\s*채널|플랫폼|경로|출처|채널|사이트|구분\s*채널|source|channel|platform|referrer)/i,
+    field: 'recruitmentCategory',
+    keywords: /(모집\s*구분|모집\s*분야|응시\s*분야|채용\s*분야|지원\s*분야|직렬|직무|지원\s*직무|채용\s*직무|포지션|category|role)/i,
   },
   {
-    field: 'experience',
-    keywords: /(경력|총\s*경력|경력\s*기간|경력\s*연수|연차|경력\s*사항|경력\s*구분|experience|career|years)/i,
+    field: 'supportNeeds',
+    keywords: /(편의\s*지원|편의\s*제공|시험\s*편의|편의\s*신청|장애\s*편의|지원\s*사항|편의)/i,
   },
   {
-    field: 'appliedDate',
-    keywords: /(지원\s*일시|지원\s*일자|지원일|접수\s*일시|접수\s*일자|접수일|제출\s*일시|제출일|등록일|지원\s*날짜|applied|date|timestamp)/i,
+    field: 'disabilityStatus',
+    keywords: /(장애인|장애\s*여부|장애\s*구분|장애\s*대상|장애\s*유형|장애\s*등급|장애)/i,
+  },
+  {
+    field: 'lowIncomeStatus',
+    keywords: /(저소득|저소득층|취약\s*계층|기초\s*수급|법정\s*저소득|차상위|저소득\s*여부)/i,
+  },
+  {
+    field: 'historyScore',
+    keywords: /(한국사|한국사\s*능력|한능검|한국사\s*급수|한국사\s*점수|한국사\s*자격|가산\s*자격)/i,
+  },
+  {
+    field: 'writtenScore',
+    keywords: /(필기\s*점수|필기\s*성적|필기\s*총점|1차\s*점수|1차\s*성적|필기\s*시험|필기)/i,
+  },
+  {
+    field: 'interviewScore',
+    keywords: /(면접\s*점수|면접\s*성적|면접\s*총점|2차\s*점수|2차\s*성적|면접\s*시험|면접)/i,
+  },
+  {
+    field: 'finalResult',
+    keywords: /(최종\s*합격\s*여부|최종\s*합격|최종\s*결과|합격\s*여부|합격\s*결과|전형\s*결과|결과|합불)/i,
   },
   {
     field: 'memo',
-    keywords: /(기타\s*메모|메모|비고|특이\s*사항|참고\s*사항|코멘트|포트폴리오|노트|첨부|한줄\s*소개|memo|note|remark|comment|portfolio)/i,
+    keywords: /(비고|특이\s*사항|참고\s*사항|메모|코멘트|기타|note|remark|memo)/i,
   },
 ];
 
